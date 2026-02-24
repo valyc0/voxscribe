@@ -3,8 +3,9 @@ import uuid
 import tempfile
 import shutil
 import logging
+import json
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from transcriber import transcribe_audio
 from diarizer import diarize_audio
 from audio_utils import extract_audio
@@ -78,7 +79,10 @@ async def transcribe_video(
         # 5. Costruisci risposta JSON
         result = build_response(segments_with_speakers)
         logger.info(f"[{job_id}] Completato. Speaker trovati: {len(result['speakers'])}")
-        return JSONResponse(content=result)
+        return Response(
+            content=json.dumps(result, ensure_ascii=False),
+            media_type="application/json",
+        )
 
     except Exception as e:
         logger.error(f"[{job_id}] Errore: {e}", exc_info=True)

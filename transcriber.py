@@ -1,18 +1,17 @@
 """
-Modulo di trascrizione basato su OpenAI Whisper (open-source).
-Whisper scarica i modelli da GitHub Releases — nessun token richiesto.
+Modulo di trascrizione basato su faster-whisper.
+
+faster-whisper usa CTranslate2 con quantizzazione int8 su CPU:
+rispetto a openai-whisper è ~4x più veloce a parità di modello.
 
 Modelli disponibili (ordine crescente di accuratezza/lentezza):
-  tiny, base, small, medium, large, large-v2, large-v3
+  tiny, base, small, medium, large-v2, large-v3
 """
 
 import os
 import logging
-import warnings
 from typing import Optional
-import whisper
-
-warnings.filterwarnings("ignore", message="FP16 is not supported on CPU")
+from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +19,15 @@ logger = logging.getLogger(__name__)
 _model_cache: dict = {}
 
 
-def _load_model(model_size: str) -> whisper.Whisper:
+def _load_model(model_size: str) -> WhisperModel:
     if model_size not in _model_cache:
-        logger.info(f"Caricamento modello Whisper '{model_size}' (primo avvio: download automatico)...")
-        _model_cache[model_size] = whisper.load_model(model_size)
+        logger.info(f"Caricamento modello faster-whisper '{model_size}'...")
+        # int8 su CPU: massima velocità senza perdita apprezzabile di qualità
+        _model_cache[model_size] = WhisperModel(
+            model_size,
+            device="cpu",
+            compute_type="int8",
+        )
         logger.info(f"Modello '{model_size}' caricato.")
     return _model_cache[model_size]
 
@@ -53,34 +57,36 @@ def transcribe_audio(
 
     model = _load_model(model_size)
 
-    decode_options: dict = {
-        "task": "transcribe",
-        "word_timestamps": True,
-        "verbose": False,
-    }
-    if language:
-        decode_options["language"] = language
-
     logger.info(f"Inizio trascrizione: {audio_path}")
-    result = model.transcribe(audio_path, **decode_options)
+    segments_iter, _ = model.transcribe(
+        audio_path,
+        language=language,
+        task="transcribe",
+        word_timestamps=True,
+        vad_filter=True,          # salta silenzio automaticamente
+        vad_parameters={
+            "min_silence_duration_ms": 500,
+        },
+        beam_size=5,
+    )
 
     segments = []
-    for seg in result.get("segments", []):
-        text = seg.get("text", "").strip()
+    for seg in segments_iter:
+        text = seg.text.strip()
         if not text:
             continue
         segments.append(
             {
-                "start": float(seg["start"]),
-                "end": float(seg["end"]),
+                "start": float(seg.start),
+                "end": float(seg.end),
                 "text": text,
                 "words": [
                     {
-                        "word": w.get("word", "").strip(),
-                        "start": float(w.get("start", seg["start"])),
-                        "end": float(w.get("end", seg["end"])),
+                        "word": w.word.strip(),
+                        "start": float(w.start),
+                        "end": float(w.end),
                     }
-                    for w in seg.get("words", [])
+                    for w in (seg.words or [])
                 ],
             }
         )

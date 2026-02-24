@@ -35,9 +35,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ── Sorgenti ──────────────────────────────────────────────────────────────────
 COPY app.py transcriber.py diarizer.py audio_utils.py ./
 
-# Pre-scarica il modello Whisper "small" durante il build
+# Pre-scarica il modello faster-whisper "small" durante il build
 # (migliore accuratezza sull'italiano rispetto a base/tiny)
-RUN python -c "import whisper; whisper.load_model('small', download_root='/app/.cache/whisper')"
+RUN python -c "\
+from faster_whisper import WhisperModel; \
+WhisperModel('small', device='cpu', compute_type='int8', download_root='/app/.cache/whisper')"
 
 # ── Avvio ─────────────────────────────────────────────────────────────────────
 EXPOSE 8000

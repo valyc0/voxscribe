@@ -23,9 +23,22 @@ from sklearn.preprocessing import normalize
 
 logger = logging.getLogger(__name__)
 
+# Cache in-process del VoiceEncoder (caricamento ~1-2 s, da fare una volta sola)
+_encoder_cache: Optional[VoiceEncoder] = None
+
+
+def _get_encoder() -> VoiceEncoder:
+    global _encoder_cache
+    if _encoder_cache is None:
+        logger.info("Caricamento VoiceEncoder (resemblyzer) — solo al primo avvio...")
+        _encoder_cache = VoiceEncoder(device="cpu")
+        logger.info("VoiceEncoder caricato e messo in cache.")
+    return _encoder_cache
+
+
 # Finestra e passo in secondi per il calcolo degli embedding
 WINDOW_SEC = 1.5
-STEP_SEC = 0.5
+STEP_SEC = 1.0   # aumentato da 0.5: meno frame → diarizzazione più veloce
 MIN_SEGMENT_DURATION = 0.3  # segmenti più brevi vengono ignorati nel clustering
 
 
@@ -56,8 +69,8 @@ def diarize_audio(
         return segments
 
     # ── 1. Carica encoder e audio ─────────────────────────────────────────────
-    logger.info("Caricamento VoiceEncoder (resemblyzer)...")
-    encoder = VoiceEncoder(device="cpu")
+    encoder = _get_encoder()
+    logger.info("VoiceEncoder pronto.")
     wav = preprocess_wav(audio_path)
 
     # ── 2. Embedding su finestre scorrevoli ───────────────────────────────────

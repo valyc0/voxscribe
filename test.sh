@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
-# test.sh — esempi di chiamate all'API di trascrizione
-# Uso: ./test.sh [file_video]
+# test.sh — test dell'API di trascrizione con salvataggio JSON e misurazione del tempo
+# Uso: ./test.sh [file_video] [modello] [lingua]
+#   es: ./test.sh videoplayback.mp4 small it
 
 set -e
 
 API="http://localhost:8000"
-VIDEO="${1:-videoplayback.mp4}"  # usa il primo argomento oppure il video di default
+VIDEO="${1:-videoplayback.mp4}"
+MODEL="${2:-small}"
+LANG="${3:-it}"
+BASENAME=$(basename "$VIDEO" | sed 's/\.[^.]*$//')
+OUTPUT="${BASENAME}_result.json"
 
 # Colori
 GREEN="\033[0;32m"
 CYAN="\033[0;36m"
 YELLOW="\033[1;33m"
+BOLD="\033[1m"
 RESET="\033[0m"
 
 sep() { echo -e "\n${CYAN}──────────────────────────────────────────${RESET}"; }
@@ -27,82 +33,71 @@ if [ ! -f "$VIDEO" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}=== Test API Trascrizione ===${RESET}"
-echo "  Video  : $VIDEO"
-echo "  API    : $API"
+GLOBAL_START=$(date +%s%3N)
+
+echo -e "${GREEN}${BOLD}=== Test API Trascrizione ===${RESET}"
+echo "  Video   : $VIDEO"
+echo "  Modello : $MODEL"
+echo "  Lingua  : $LANG"
+echo "  Output  : $OUTPUT"
+echo "  API     : $API"
 
 # ── 1. Health check ───────────────────────────────────────────────────────────
 sep
 echo -e "${CYAN}[1] Health check${RESET}"
-curl -sf "$API/health" | python3 -m json.tool
+t0=$(date +%s%3N)
+curl -sf "$API/health" | python3 -c "import sys,json; json.dump(json.load(sys.stdin), sys.stdout, ensure_ascii=False, indent=2); print()"
+echo -e "${YELLOW}  ⏱  $(( $(date +%s%3N) - t0 )) ms${RESET}"
+
+# ── 2. Trascrizione ───────────────────────────────────────────────────────────
+sep
+echo -e "${CYAN}[2] Trascrizione (modello='$MODEL', lingua='$LANG', auto-detect speaker)${RESET}"
 echo ""
 
-# ── 2. Trascrizione base (italiano, modello tiny — più veloce per test) ────────
-sep
-echo -e "${CYAN}[2] Trascrizione — italiano, modello 'small'${RESET}"
-echo "Comando:"
-echo "  curl -X POST $API/transcribe \\"
-echo "       -F \"file=@$VIDEO\" \\"
-echo "       -F \"language=it\" \\"
-echo "       -F \"model_size=small\""
-echo ""
+t0=$(date +%s%3N)
+
+# Salva la risposta raw su file (l'API restituisce già UTF-8 corretto)
 curl -s -X POST "$API/transcribe" \
      -F "file=@$VIDEO" \
-     -F "language=it" \
-     -F "model_size=small" \
-  | python3 -m json.tool
+     -F "language=$LANG" \
+     -F "model_size=$MODEL" \
+     -o "$OUTPUT"
+
+ELAPSED=$(( $(date +%s%3N) - t0 ))
+
+# Ri-serializza con ensure_ascii=False per avere il file con caratteri leggibili
+python3 - "$OUTPUT" <<'PYEOF'
+import sys, json
+path = sys.argv[1]
+data = json.load(open(path, encoding="utf-8"))
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PYEOF
+
+echo -e "${GREEN}File salvato: $OUTPUT${RESET}"
 echo ""
 
-# ── 3. Modello 'base' con rilevamento automatico della lingua ─────────────────
-sep
-echo -e "${CYAN}[3] Auto-detect lingua, modello 'small'${RESET}"
-echo "Comando:"
-echo "  curl -X POST $API/transcribe \\"
-echo "       -F \"file=@$VIDEO\" \\"
-echo "       -F \"language=auto\" \\"
-echo "       -F \"model_size=small\""
-echo ""
-curl -s -X POST "$API/transcribe" \
-     -F "file=@$VIDEO" \
-     -F "language=auto" \
-     -F "model_size=small" \
-  | python3 -m json.tool
-echo ""
+# Stampa a schermo (solo dialogue + speakers per non intasare il terminale)
+python3 - "$OUTPUT" <<'PYEOF'
+import sys, json
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+print(f"  Speaker trovati : {', '.join(data.get('speakers', []))}")
+for sp, info in data.get("speaker_details", {}).items():
+    print(f"    {sp}: {info['total_segments']} segmenti, {info['total_duration_sec']:.1f}s")
+print()
+print("  --- Dialogo ---")
+for line in data.get("dialogue", "").split("\n\n"):
+    if line.strip():
+        print(f"  {line.strip()}")
+PYEOF
 
-# ── 4. Forza 2 speaker ────────────────────────────────────────────────────────
-sep
-echo -e "${CYAN}[4] Forza esattamente 2 interlocutori${RESET}"
-echo "Comando:"
-echo "  curl -X POST $API/transcribe \\"
-echo "       -F \"file=@$VIDEO\" \\"
-echo "       -F \"language=it\" \\"
-echo "       -F \"model_size=tiny\" \\"
-echo "       -F \"num_speakers=2\""
 echo ""
-curl -s -X POST "$API/transcribe" \
-     -F "file=@$VIDEO" \
-     -F "language=it" \
-     -F "model_size=small" \
-     -F "num_speakers=2" \
-  | python3 -m json.tool
-echo ""
+echo -e "${YELLOW}  ⏱  Tempo trascrizione: ${ELAPSED} ms ($(( ELAPSED / 1000 )).$(( ELAPSED % 1000 / 10 )) s)${RESET}"
 
-# ── 5. Salva output su file JSON ─────────────────────────────────────────────
+# ── Tempo totale ──────────────────────────────────────────────────────────────
+GLOBAL_ELAPSED=$(( $(date +%s%3N) - GLOBAL_START ))
 sep
-echo -e "${CYAN}[5] Salva output in output.json${RESET}"
-echo "Comando:"
-echo "  curl -X POST $API/transcribe \\"
-echo "       -F \"file=@$VIDEO\" \\"
-echo "       -F \"language=it\" \\"
-echo "       -o output.json"
-echo ""
-curl -s -X POST "$API/transcribe" \
-     -F "file=@$VIDEO" \
-     -F "language=it" \
-     -o output.json
-echo "File salvato: output.json"
-python3 -m json.tool output.json
-echo ""
-
-sep
-echo -e "${GREEN}Test completati.${RESET}"
+echo -e "${GREEN}${BOLD}Test completati.${RESET}"
+echo -e "${GREEN}${BOLD}⏱  Tempo totale: ${GLOBAL_ELAPSED} ms ($(( GLOBAL_ELAPSED / 1000 )).$(( GLOBAL_ELAPSED % 1000 / 10 )) s)${RESET}"
+echo -e "${GREEN}${BOLD}📄 JSON completo: $OUTPUT${RESET}"
