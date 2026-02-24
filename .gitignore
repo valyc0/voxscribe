@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+lib/
+lib64/
+*.egg-link
+.installed.cfg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# Environment variables
+.env.local
+.env.*.local
+*.env
+
+# Whisper / ML models cache
+~/.cache/whisper/
+models/
+*.pt
+*.bin
+*.onnx
+
+# Audio/video uploads e output temporanei
+uploads/
+output/
+tmp/
+temp/
+*.wav
+*.mp3
+*.mp4
+*.mkv
+*.ogg
+*.flac
+*.webm
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
