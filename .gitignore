@@ -52,6 +52,10 @@ temp/
 *.flac
 *.webm
 
+# Risultati trascrizione (ignorati tranne .gitkeep per tracciare la dir)
+voxscribe_results/*
+!voxscribe_results/.gitkeep
+
 # Logs
 *.log
 logs/

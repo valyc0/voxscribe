@@ -8,8 +8,14 @@ services:
     volumes:
       # Cache modelli persistente tra i riavvii del container
       - model_cache:/app/.cache
+      # Risultati JSON persistenti (job_id = sha256 del file)
+      - ./voxscribe_results:/data/voxscribe_results
     environment:
       - PYTHONUNBUFFERED=1
+      - VOXSCRIBE_RESULTS_DIR=/data/voxscribe_results
+      - VOXSCRIBE_WORK_DIR=/tmp/voxscribe_work
+      - VOXSCRIBE_MAX_JOBS=1000
+      - VOXSCRIBE_MAX_WORKERS=2
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
