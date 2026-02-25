@@ -422,6 +422,49 @@ async def list_jobs(limit: int = 50):
     return {"total_in_memory": len(items), "jobs": items[:limit]}
 
 
+@app.delete("/results", status_code=200)
+async def delete_all_results():
+    """
+    Cancella tutti i risultati dal disco e azzera il registro in memoria.
+    I job attualmente in elaborazione (pending/processing) vengono saltati.
+    """
+    # Individua i job attivi da non toccare
+    with _jobs_lock:
+        active = {k for k, v in _jobs.items() if v["status"] in ("pending", "processing")}
+
+    deleted_files = 0
+    skipped_active = 0
+    errors = []
+
+    if os.path.isdir(RESULTS_DIR):
+        for entry in os.scandir(RESULTS_DIR):
+            if not entry.is_dir():
+                continue
+            checksum = entry.name
+            if checksum in active:
+                skipped_active += 1
+                continue
+            try:
+                shutil.rmtree(entry.path)
+                deleted_files += 1
+            except Exception as exc:
+                errors.append(f"{checksum[:12]}: {exc}")
+
+    # Rimuovi dalla cache in memoria tutto tranne i job attivi
+    with _jobs_lock:
+        to_remove = [k for k in _jobs if k not in active]
+        for k in to_remove:
+            del _jobs[k]
+
+    logger.info(f"[delete_all_results] Eliminati {deleted_files} risultati, saltati {skipped_active} attivi.")
+    return {
+        "deleted": deleted_files,
+        "skipped_active": skipped_active,
+        "jobs_in_memory_remaining": len(active),
+        "errors": errors,
+    }
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
