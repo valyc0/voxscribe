@@ -259,7 +259,7 @@ async def transcribe_video(
 
     Parametri:
     - language   : codice lingua ISO 639-1 (default 'it'). Usa 'auto' per auto-detect.
-    - model_size : tiny | base | small | medium | large (default 'small')
+    - model_size : tiny | base | small | medium | large-v2 | large-v3 (default 'small'; 'large' è alias di large-v3)
     - num_speakers: numero atteso di speaker (None = auto-detect)
 
     Esempio:
