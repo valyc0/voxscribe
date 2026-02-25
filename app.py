@@ -29,8 +29,9 @@ from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
+import pathlib
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse
 
 from transcriber import transcribe_audio
 from diarizer import diarize_audio
@@ -227,6 +228,12 @@ def _process_job(
 # ──────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def serve_ui():
+    html = (pathlib.Path(__file__).parent / "client-web" / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(content=html)
+
 
 @app.get("/health")
 async def health():

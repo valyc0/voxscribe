@@ -34,6 +34,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # ── Sorgenti ──────────────────────────────────────────────────────────────────
 COPY app.py transcriber.py diarizer.py audio_utils.py ./
+COPY client-web/ ./client-web/
 
 # Pre-scarica il modello faster-whisper "small" durante il build
 # (migliore accuratezza sull'italiano rispetto a base/tiny)

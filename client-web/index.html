@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>VoxScribe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --bg2: #1a1d27;
+      --bg3: #222638;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --success: #22c55e;
+      --warn: #f59e0b;
+      --error: #ef4444;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --border: #2d3148;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,.4);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0 20px;
+    }
+    header .logo { font-size: 1.6rem; }
+    header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.02em; }
+    header h1 span { color: var(--accent2); }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 680px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Drop zone ── */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 36px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    #drop-zone.drag-over { border-color: var(--accent); background: rgba(108,99,255,.08); }
+    #drop-zone .dz-icon { font-size: 2.8rem; margin-bottom: 8px; }
+    #drop-zone p { color: var(--text2); font-size: .9rem; margin-top: 6px; }
+    #drop-zone strong { color: var(--text); }
+    #file-input { display: none; }
+
+    #file-name {
+      margin-top: 10px;
+      font-size: .85rem;
+      color: var(--accent2);
+      min-height: 18px;
+      word-break: break-all;
+    }
+
+    /* ── Params ── */
+    .params { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .param-group { flex: 1; min-width: 130px; }
+    .param-group label { display: block; font-size: .78rem; color: var(--text2); margin-bottom: 4px; }
+    .param-group select {
+      width: 100%;
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: .9rem;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    /* ── Upload button ── */
+    #upload-btn {
+      margin-top: 18px;
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    #upload-btn:active { transform: scale(.98); }
+    #upload-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Progress bar ── */
+    #progress-wrap { margin-top: 14px; display: none; }
+    #progress-bar-bg {
+      background: var(--bg3);
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 99px;
+      width: 0%;
+      transition: width .3s;
+    }
+    #progress-label { font-size: .78rem; color: var(--text2); margin-top: 5px; text-align: center; }
+
+    /* ── Status card ── */
+    #status-card { display: none; }
+    #status-card .s-row { display: flex; align-items: center; gap: 10px; }
+    #status-badge {
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .badge-pending  { background: rgba(245,158,11,.18); color: var(--warn); }
+    .badge-processing { background: rgba(108,99,255,.22); color: var(--accent2); }
+    .badge-done     { background: rgba(34,197,94,.18); color: var(--success); }
+    .badge-error    { background: rgba(239,68,68,.18); color: var(--error); }
+
+    #status-filename { font-size: .9rem; color: var(--text); font-weight: 600; flex: 1; word-break: break-all; }
+    .s-meta { font-size: .78rem; color: var(--text2); margin-top: 8px; line-height: 1.7; }
+    .s-meta span { color: var(--text); }
+
+    /* ── Error box ── */
+    #error-box {
+      display: none;
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: .9rem;
+      color: var(--error);
+      margin-top: 10px;
+    }
+
+    /* ── Result card ── */
+    #result-card { display: none; }
+
+    .section-title {
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text2);
+      margin-bottom: 10px;
+    }
+
+    /* Speaker chips */
+    #speakers-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .sp-chip {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 4px 12px;
+      font-size: .82rem;
+    }
+    .sp-chip span { color: var(--text2); }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; gap: 4px; }
+    .tab {
+      padding: 7px 14px;
+      font-size: .85rem;
+      cursor: pointer;
+      color: var(--text2);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .15s;
+      user-select: none;
+    }
+    .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Dialogue */
+    #dialogue-content {
+      font-size: .92rem;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .sp-line { margin: 6px 0; }
+    .sp-label { font-weight: 700; color: var(--accent2); }
+
+    /* Transcription */
+    #transcription-content {
+      font-size: .92rem;
+      line-height: 1.75;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Segments table */
+    #segments-content { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th { text-align: left; color: var(--text2); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    td { padding: 6px 8px; border-bottom: 1px solid rgba(45,49,72,.6); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .td-time { white-space: nowrap; color: var(--text2); font-size: .78rem; }
+    .td-sp { white-space: nowrap; color: var(--accent2); font-weight: 600; }
+
+    /* Download btn */
+    #download-btn {
+      margin-top: 14px;
+      width: 100%;
+      padding: 11px;
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background .15s;
+    }
+    #download-btn:hover { background: var(--border); }
+
+    /* New upload button */
+    #new-btn {
+      width: 100%;
+      max-width: 680px;
+      padding: 11px;
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: .9rem;
+      cursor: pointer;
+      display: none;
+      margin-bottom: 24px;
+    }
+    #new-btn:hover { color: var(--text); border-color: var(--text2); }
+
+    /* Spinner */
+    .spin {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Pulse dot */
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent2);
+      flex-shrink: 0;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* Job ID copy */
+    #job-id-box {
+      font-size: .72rem;
+      color: var(--text2);
+      margin-top: 8px;
+      word-break: break-all;
+      cursor: pointer;
+    }
+    #job-id-box:hover { color: var(--accent2); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎙️</div>
+  <h1>Vox<span>Scribe</span></h1>
+</header>
+
+<!-- Upload card -->
+<div class="card" id="upload-card">
+  <div id="drop-zone">
+    <div class="dz-icon">☁️</div>
+    <strong>Trascina qui il tuo file media</strong>
+    <p>oppure tocca per selezionare</p>
+    <p style="margin-top:8px;font-size:.78rem;">Video o audio: mp4, mkv, avi, mov, mp3, wav, m4a…</p>
+    <input type="file" id="file-input" accept="video/*,audio/*,.mp3,.wav,.m4a,.ogg,.flac">
+  </div>
+  <div id="file-name"></div>
+
+  <div class="params">
+    <div class="param-group">
+      <label>Lingua</label>
+      <select id="lang">
+        <option value="it" selected>🇮🇹 Italiano</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="pt">🇵🇹 Português</option>
+        <option value="auto">🌐 Auto-detect</option>
+      </select>
+    </div>
+    <div class="param-group">
+      <label>Modello Whisper</label>
+      <select id="model">
+        <option value="tiny">Tiny (velocissimo)</option>
+        <option value="base">Base (veloce)</option>
+        <option value="small" selected>Small ✓ (consigliato)</option>
+        <option value="medium">Medium (lento)</option>
+        <option value="large">Large (molto lento)</option>
+      </select>
+    </div>
+    <div class="param-group">
+      <label>Num. speaker</label>
+      <select id="num-speakers">
+        <option value="" selected>Auto-detect</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </div>
+  </div>
+
+  <button id="upload-btn" disabled>
+    <span>⬆️</span> Avvia trascrizione
+  </button>
+
+  <div id="progress-wrap">
+    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+    <div id="progress-label">Caricamento…</div>
+  </div>
+
+  <div id="error-box"></div>
+</div>
+
+<!-- Status card -->
+<div class="card" id="status-card">
+  <div class="s-row">
+    <div id="status-indicator"></div>
+    <div id="status-filename">—</div>
+    <div id="status-badge" class="badge-pending">pending</div>
+  </div>
+  <div class="s-meta" id="status-meta"></div>
+  <div id="job-id-box" title="Tocca per copiare il job_id"></div>
+</div>
+
+<!-- Result card -->
+<div class="card" id="result-card">
+  <div id="speakers-wrap"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="dialogue">💬 Dialogo</div>
+    <div class="tab" data-tab="transcription">📝 Testo completo</div>
+    <div class="tab" data-tab="segments">⏱ Segmenti</div>
+  </div>
+
+  <div class="tab-panel active" id="tab-dialogue">
+    <div id="dialogue-content"></div>
+  </div>
+  <div class="tab-panel" id="tab-transcription">
+    <div id="transcription-content"></div>
+  </div>
+  <div class="tab-panel" id="tab-segments">
+    <div id="segments-content"></div>
+  </div>
+
+  <button id="download-btn">⬇️ Scarica JSON completo</button>
+</div>
+
+<button id="new-btn">➕ Nuova trascrizione</button>
+
+<script>
+  const API = '';   // stesso origin — nessun CORS
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let selectedFile = null;
+  let pollTimer    = null;
+  let currentJobId = null;
+  let resultData   = null;
+
+  // ── Speaker colours (cyclic) ───────────────────────────────────────────────
+  const SP_COLORS = ['#a78bfa','#34d399','#f472b6','#60a5fa','#fb923c','#e879f9'];
+  const spColor = (sp) => SP_COLORS[parseInt(sp.replace(/\D/g,'') || 0) % SP_COLORS.length];
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const dropZone     = document.getElementById('drop-zone');
+  const fileInput    = document.getElementById('file-input');
+  const fileNameEl   = document.getElementById('file-name');
+  const uploadBtn    = document.getElementById('upload-btn');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressBar  = document.getElementById('progress-bar');
+  const progressLbl  = document.getElementById('progress-label');
+  const errorBox     = document.getElementById('error-box');
+
+  const uploadCard   = document.getElementById('upload-card');
+  const statusCard   = document.getElementById('status-card');
+  const resultCard   = document.getElementById('result-card');
+  const newBtn       = document.getElementById('new-btn');
+
+  // ── Drop zone ───────────────────────────────────────────────────────────────
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+  function setFile(f) {
+    selectedFile = f;
+    fileNameEl.textContent = `📎 ${f.name}  (${(f.size/1024/1024).toFixed(1)} MB)`;
+    uploadBtn.disabled = false;
+    hideError();
+  }
+
+  // ── Tabs ────────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Upload ──────────────────────────────────────────────────────────────────
+  uploadBtn.addEventListener('click', startUpload);
+
+  async function startUpload() {
+    if (!selectedFile) return;
+    hideError();
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<div class="spin"></div> Caricamento…';
+    progressWrap.style.display = 'block';
+    progressBar.style.width = '0%';
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('language', document.getElementById('lang').value);
+    fd.append('model_size', document.getElementById('model').value);
+    const ns = document.getElementById('num-speakers').value;
+    if (ns) fd.append('num_speakers', ns);
+
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', API + '/transcribe');
+
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pct = Math.round(e.loaded / e.total * 100);
+          progressBar.style.width = pct + '%';
+          progressLbl.textContent = `Caricamento… ${pct}%`;
+        }
+      };
+
+      const resp = await new Promise((resolve, reject) => {
+        xhr.onload  = () => resolve(xhr);
+        xhr.onerror = () => reject(new Error('Errore di rete'));
+        xhr.send(fd);
+      });
+
+      const data = JSON.parse(resp.responseText);
+
+      progressBar.style.width = '100%';
+      progressLbl.textContent = 'Upload completato ✓';
+      uploadBtn.innerHTML = '⬆️ Avvia trascrizione';
+
+      if (!data.job_id) throw new Error(data.detail || 'Risposta inattesa dal server');
+
+      currentJobId = data.job_id;
+
+      // Se già done (dedup)
+      if (data.status === 'done') {
+        showStatusCard(data);
+        await fetchResult(currentJobId);
+        return;
+      }
+
+      showStatusCard(data);
+      startPolling(currentJobId);
+
+    } catch (e) {
+      showError(e.message);
+      uploadBtn.disabled = false;
+      uploadBtn.innerHTML = '⬆️ Avvia trascrizione';
+    }
+  }
+
+  // ── Status card ─────────────────────────────────────────────────────────────
+  function showStatusCard(data) {
+    statusCard.style.display = 'block';
+    resultCard.style.display = 'none';
+    renderStatus(data);
+  }
+
+  function renderStatus(data) {
+    const badge = document.getElementById('status-badge');
+    const ind   = document.getElementById('status-indicator');
+    const fn    = document.getElementById('status-filename');
+    const meta  = document.getElementById('status-meta');
+    const jid   = document.getElementById('job-id-box');
+
+    fn.textContent = data.filename || selectedFile?.name || '—';
+    badge.textContent = data.status;
+    badge.className = 'badge-' + data.status;
+
+    if (data.status === 'processing' || data.status === 'pending') {
+      ind.className = 'dot';
+    } else {
+      ind.className = '';
+      ind.textContent = data.status === 'done' ? '✅' : '❌';
+    }
+
+    let m = '';
+    if (data.created_at)   m += `Avviato: <span>${fmtDate(data.created_at)}</span><br>`;
+    if (data.started_at)   m += `Elaborazione: <span>${fmtDate(data.started_at)}</span><br>`;
+    if (data.completed_at) m += `Completato: <span>${fmtDate(data.completed_at)}</span><br>`;
+    if (data.elapsed_sec != null) m += `Tempo elaborazione: <span>${data.elapsed_sec}s</span>`;
+    meta.innerHTML = m;
+
+    jid.textContent = 'job_id: ' + (data.job_id || '');
+    jid.onclick = () => { navigator.clipboard?.writeText(data.job_id); jid.textContent = '✓ Copiato!'; setTimeout(()=>{ jid.textContent = 'job_id: '+data.job_id; }, 1500); };
+  }
+
+  // ── Polling ─────────────────────────────────────────────────────────────────
+  function startPolling(jobId) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => pollStatus(jobId), 5000);
+  }
+
+  async function pollStatus(jobId) {
+    try {
+      const r = await fetch(API + '/status/' + jobId);
+      const data = await r.json();
+      renderStatus(data);
+      if (data.status === 'done') {
+        clearInterval(pollTimer);
+        await fetchResult(jobId);
+      } else if (data.status === 'error') {
+        clearInterval(pollTimer);
+        showError(data.error || 'Errore durante l\'elaborazione');
+      }
+    } catch(e) { /* retry */ }
+  }
+
+  // ── Fetch result ─────────────────────────────────────────────────────────────
+  async function fetchResult(jobId) {
+    try {
+      const r = await fetch(API + '/result/' + jobId);
+      if (!r.ok) { showError('Errore nel recupero del risultato'); return; }
+      resultData = await r.json();
+      renderResult(resultData);
+      resultCard.style.display = 'block';
+      newBtn.style.display = 'block';
+    } catch(e) { showError(e.message); }
+  }
+
+  // ── Render result ────────────────────────────────────────────────────────────
+  function renderResult(d) {
+    // Speaker chips
+    const sWrap = document.getElementById('speakers-wrap');
+    sWrap.innerHTML = '<div class="section-title">Speaker rilevati</div>';
+    (d.speakers || []).forEach(sp => {
+      const chip = document.createElement('div');
+      chip.className = 'sp-chip';
+      const details = d.speaker_details?.[sp];
+      chip.style.borderColor = spColor(sp);
+      chip.innerHTML = `<b style="color:${spColor(sp)}">${sp}</b>  <span>${details ? details.total_segments + ' segm · ' + details.total_duration_sec + 's' : ''}</span>`;
+      sWrap.appendChild(chip);
+    });
+
+    // Dialogue
+    const dlg = document.getElementById('dialogue-content');
+    dlg.innerHTML = '';
+    const lines = (d.dialogue || '').split(/\n+/).filter(l => l.trim());
+    lines.forEach(line => {
+      const match = line.match(/^(Speaker_\d+):\s*(.*)/s);
+      const div = document.createElement('div');
+      div.className = 'sp-line';
+      if (match) {
+        const color = spColor(match[1]);
+        div.innerHTML = `<span class="sp-label" style="color:${color}">${match[1]}:</span> ${escHtml(match[2])}`;
+      } else {
+        div.textContent = line;
+      }
+      dlg.appendChild(div);
+    });
+
+    // Transcription
+    document.getElementById('transcription-content').textContent = d.transcription || '';
+
+    // Segments
+    const seg = document.getElementById('segments-content');
+    seg.innerHTML = '';
+    if (d.segments?.length) {
+      const tbl = document.createElement('table');
+      tbl.innerHTML = '<thead><tr><th>Tempo</th><th>Speaker</th><th>Testo</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      d.segments.forEach(s => {
+        const tr = document.createElement('tr');
+        const color = spColor(s.speaker || '');
+        tr.innerHTML = `<td class="td-time">${fmt(s.start)}–${fmt(s.end)}</td>
+                        <td class="td-sp" style="color:${color}">${escHtml(s.speaker||'')}</td>
+                        <td>${escHtml(s.text||'')}</td>`;
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      seg.appendChild(tbl);
+    }
+  }
+
+  // ── Download JSON ─────────────────────────────────────────────────────────────
+  document.getElementById('download-btn').addEventListener('click', () => {
+    if (!resultData) return;
+    const blob = new Blob([JSON.stringify(resultData, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (resultData.filename?.replace(/\.[^.]+$/, '') || 'result') + '_transcript.json';
+    a.click();
+  });
+
+  // ── New upload ────────────────────────────────────────────────────────────────
+  newBtn.addEventListener('click', () => {
+    selectedFile = null;
+    currentJobId = null;
+    resultData   = null;
+    if (pollTimer) clearInterval(pollTimer);
+    fileInput.value = '';
+    fileNameEl.textContent = '';
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '⬆️ Avvia trascrizione';
+    progressWrap.style.display = 'none';
+    progressBar.style.width = '0%';
+    statusCard.style.display = 'none';
+    resultCard.style.display = 'none';
+    newBtn.style.display = 'none';
+    hideError();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // ── Job ID copy in status card ─────────────────────────────────────────────
+  document.getElementById('job-id-box').addEventListener('click', () => {});
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+  function fmt(sec) {
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  function fmtDate(iso) {
+    try { return new Date(iso).toLocaleString('it-IT', { hour12: false }); } catch { return iso; }
+  }
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function showError(msg) {
+    errorBox.style.display = 'block';
+    errorBox.textContent = '⚠️ ' + msg;
+  }
+  function hideError() {
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+  }
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 # VoxScribe
 
 > Trascrizione automatica di video e identificazione degli interlocutori via API REST **asincrona**.
-> Nessun token, nessun servizio esterno — gira tutto in locale o in Docker.
+> Interfaccia web responsive inclusa. Nessun token, nessun servizio esterno — gira tutto in locale o in Docker.
 
 ---
 
@@ -46,6 +46,26 @@ POST /transcribe (curl)
 ```
 
 Il registro in memoria tiene al massimo **1000 job** (FIFO); i risultati su disco persistono oltre il registro RAM.
+
+---
+
+## Web UI
+
+Una volta avviato il server, apri nel browser (desktop o smartphone):
+
+```
+http://localhost:8000/
+```
+
+Funzionalità:
+- **Drag & drop** o selezione file (video e audio, qualsiasi formato ffmpeg)
+- Selezione lingua, modello Whisper e numero di speaker
+- **Progress bar** durante l'upload
+- **Polling automatico** dello stato del job ogni 5 secondi
+- Visualizzazione risultato in tre tab: **Dialogo** · **Testo completo** · **Segmenti con timestamp**
+- **Deduplicazione** automatica: se carichi lo stesso file già elaborato viene mostrato subito il risultato
+- Pulsante **Scarica JSON** per salvare il risultato completo
+- Completamente **responsive** — funziona su smartphone e tablet
 
 ---
 
@@ -146,6 +166,7 @@ curl http://localhost:8000/jobs?limit=20
 
 | Metodo | Path | Descrizione |
 |---|---|---|
+| `GET` | `/` | Web UI (browser) |
 | `POST` | `/transcribe` | Carica file, avvia elaborazione asincrona |
 | `GET` | `/status/{job_id}` | Stato del job |
 | `GET` | `/result/{job_id}` | JSON risultato (solo se done) |
@@ -168,6 +189,7 @@ curl http://localhost:8000/jobs?limit=20
 ```json
 {
   "job_id": "a3f84c...",
+  "filename": "video.mp4",
   "transcription": "Testo completo del parlato...",
   "dialogue": "Speaker_1: Prima battuta\n\nSpeaker_2: Risposta",
   "speakers": ["Speaker_1", "Speaker_2"],
@@ -210,11 +232,14 @@ voxscribe/
 ├── transcriber.py      # Trascrizione Whisper
 ├── diarizer.py         # Diarizzazione speaker (resemblyzer + sklearn)
 ├── audio_utils.py      # Estrazione audio via ffmpeg
+├── client-web/
+│   └── index.html      # Web UI responsive (servita da FastAPI su GET /)
+├── voxscribe_results/  # Risultati JSON persistenti (bind mount Docker)
 ├── requirements.txt    # Dipendenze Python
 ├── Dockerfile          # Build immagine Docker
 ├── docker-compose.yml  # Orchestrazione container
 ├── start.sh            # Avvio one-shot
-├── test.sh             # Test curl automatici
+├── test.sh             # Test curl automatici (async-aware)
 └── backup.sh           # Backup sorgenti con timestamp
 ```
 
