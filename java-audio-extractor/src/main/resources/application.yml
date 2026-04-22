@@ -1,0 +1,28 @@
+server:
+  port: 8081
+
+audio-extractor:
+  # Directory che contiene i file video da elaborare.
+  # Modificare con il percorso reale o impostare la variabile d'ambiente:
+  #   AUDIO_EXTRACTOR_VIDEO_DIR=/path/to/videos
+  video-dir: /tmp/videos
+
+  # Percorso del binario ffmpeg. Di default usa quello nel PATH di sistema.
+  # Esempio con percorso assoluto:
+  #   ffmpeg-path: /usr/bin/ffmpeg
+  ffmpeg-path: ffmpeg
+
+  # Bitrate dell'MP3 in kbps (es. 128, 192, 320)
+  audio-bitrate: 192
+
+spring:
+  mvc:
+    async:
+      # Nessun timeout per le richieste in streaming (-1 = illimitato)
+      request-timeout: -1
+
+logging:
+  level:
+    com.voxscribe: INFO
+    # Aumentare a DEBUG per vedere il log riga per riga di ffmpeg
+    # com.voxscribe: DEBUG
